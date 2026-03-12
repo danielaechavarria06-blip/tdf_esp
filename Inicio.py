@@ -4,7 +4,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import re
 from nltk.stem import SnowballStemmer
-import matplotlib.pyplot as plt
 import json
 from streamlit_lottie import st_lottie
 
@@ -35,7 +34,7 @@ lottie_animation = load_lottiefile("animacion.json")
 
 st.title("🔍 Demo TF-IDF en Español")
 
-# Mostrar animación centrada
+# animación centrada
 col1, col2, col3 = st.columns([1,2,1])
 
 with col2:
@@ -58,22 +57,20 @@ La música suena muy alta en la fiesta.
 Los pájaros cantan hermosas melodías al amanecer."""
 
 # ---------------------------
-# GRÁFICA INICIAL
+# GRÁFICA SIMPLE (SIN MATPLOTLIB)
 # ---------------------------
 
-st.subheader("📊 Vista rápida de documentos")
+st.subheader("📊 Palabras por documento")
 
 documents_chart = default_docs.split("\n")
 doc_lengths = [len(d.split()) for d in documents_chart]
 
-fig, ax = plt.subplots()
+chart_df = pd.DataFrame({
+    "Documento": [f"Doc {i+1}" for i in range(len(doc_lengths))],
+    "Palabras": doc_lengths
+})
 
-ax.bar(range(len(doc_lengths)), doc_lengths)
-ax.set_xlabel("Documento")
-ax.set_ylabel("Cantidad de palabras")
-ax.set_title("Palabras por documento")
-
-st.pyplot(fig)
+st.bar_chart(chart_df.set_index("Documento"))
 
 # ---------------------------
 # STEMMER
@@ -175,7 +172,7 @@ if st.button("🔍 Analizar", type="primary"):
 
         st.dataframe(df_tfidf.round(3), use_container_width=True)
 
-        # Similitud
+        # similitud
 
         question_vec = vectorizer.transform([question])
 

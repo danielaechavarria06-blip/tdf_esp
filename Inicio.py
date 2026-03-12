@@ -5,10 +5,16 @@ import pandas as pd
 import re
 from nltk.stem import SnowballStemmer
 import json
-from streamlit_lottie import st_lottie
+
+# intentar cargar lottie
+try:
+    from streamlit_lottie import st_lottie
+    lottie_available = True
+except:
+    lottie_available = False
 
 # ---------------------------
-# CONFIGURACIÓN DE LA PÁGINA
+# CONFIGURACIÓN
 # ---------------------------
 
 st.set_page_config(
@@ -18,15 +24,12 @@ st.set_page_config(
 )
 
 # ---------------------------
-# CARGAR ANIMACIÓN LOTTIE
+# FUNCIÓN LOTTIE
 # ---------------------------
 
 def load_lottiefile(filepath):
     with open(filepath, "r") as f:
         return json.load(f)
-
-# ⚠️ CAMBIA AQUÍ EL NOMBRE DE TU JSON
-lottie_animation = load_lottiefile("animacion.json")
 
 # ---------------------------
 # TÍTULO
@@ -34,19 +37,24 @@ lottie_animation = load_lottiefile("animacion.json")
 
 st.title("🔍 Demo TF-IDF en Español")
 
-# animación centrada
-col1, col2, col3 = st.columns([1,2,1])
+# mostrar animación solo si existe la librería
+if lottie_available:
+    try:
+        lottie_animation = load_lottiefile("animacion.json")
 
-with col2:
-    st_lottie(
-        lottie_animation,
-        speed=1,
-        height=250,
-        key="initial_animation"
-    )
+        col1, col2, col3 = st.columns([1,2,1])
+
+        with col2:
+            st_lottie(
+                lottie_animation,
+                speed=1,
+                height=250
+            )
+    except:
+        st.info("Animación no encontrada")
 
 # ---------------------------
-# DOCUMENTOS DE EJEMPLO
+# DOCUMENTOS
 # ---------------------------
 
 default_docs = """El perro ladra fuerte en el parque.
@@ -57,7 +65,7 @@ La música suena muy alta en la fiesta.
 Los pájaros cantan hermosas melodías al amanecer."""
 
 # ---------------------------
-# GRÁFICA SIMPLE (SIN MATPLOTLIB)
+# GRÁFICA SIMPLE
 # ---------------------------
 
 st.subheader("📊 Palabras por documento")
@@ -90,7 +98,7 @@ def tokenize_and_stem(text):
     return stems
 
 # ---------------------------
-# LAYOUT PRINCIPAL
+# INTERFAZ
 # ---------------------------
 
 col1, col2 = st.columns([2, 1])
@@ -112,88 +120,61 @@ with col2:
 
     st.markdown("### 💡 Preguntas sugeridas:")
 
-    if st.button("¿Dónde juegan el perro y el gato?", use_container_width=True):
+    if st.button("¿Dónde juegan el perro y el gato?"):
         st.session_state.question = "¿Dónde juegan el perro y el gato?"
         st.rerun()
 
-    if st.button("¿Qué hacen los niños en el parque?", use_container_width=True):
+    if st.button("¿Qué hacen los niños en el parque?"):
         st.session_state.question = "¿Qué hacen los niños en el parque?"
         st.rerun()
 
-    if st.button("¿Cuándo cantan los pájaros?", use_container_width=True):
+    if st.button("¿Cuándo cantan los pájaros?"):
         st.session_state.question = "¿Cuándo cantan los pájaros?"
         st.rerun()
 
-    if st.button("¿Dónde suena la música alta?", use_container_width=True):
-        st.session_state.question = "¿Dónde suena la música alta?"
-        st.rerun()
-
-    if st.button("¿Qué animal maúlla durante la noche?", use_container_width=True):
-        st.session_state.question = "¿Qué animal maúlla durante la noche?"
-        st.rerun()
-
-# ---------------------------
-# ACTUALIZAR PREGUNTA
-# ---------------------------
+# actualizar pregunta
 
 if 'question' in st.session_state:
     question = st.session_state.question
 
 # ---------------------------
-# BOTÓN ANALIZAR
+# ANALIZAR
 # ---------------------------
 
-if st.button("🔍 Analizar", type="primary"):
+if st.button("🔍 Analizar"):
 
     documents = [d.strip() for d in text_input.split("\n") if d.strip()]
 
-    if len(documents) < 1:
-        st.error("⚠️ Ingresa al menos un documento.")
+    vectorizer = TfidfVectorizer(
+        tokenizer=tokenize_and_stem,
+        min_df=1
+    )
 
-    elif not question.strip():
-        st.error("⚠️ Escribe una pregunta.")
+    X = vectorizer.fit_transform(documents)
 
-    else:
+    st.markdown("### 📊 Matriz TF-IDF")
 
-        vectorizer = TfidfVectorizer(
-            tokenizer=tokenize_and_stem,
-            min_df=1
-        )
+    df_tfidf = pd.DataFrame(
+        X.toarray(),
+        columns=vectorizer.get_feature_names_out(),
+        index=[f"Doc {i+1}" for i in range(len(documents))]
+    )
 
-        X = vectorizer.fit_transform(documents)
+    st.dataframe(df_tfidf.round(3), use_container_width=True)
 
-        st.markdown("### 📊 Matriz TF-IDF")
+    question_vec = vectorizer.transform([question])
 
-        df_tfidf = pd.DataFrame(
-            X.toarray(),
-            columns=vectorizer.get_feature_names_out(),
-            index=[f"Doc {i+1}" for i in range(len(documents))]
-        )
+    similarities = cosine_similarity(question_vec, X).flatten()
 
-        st.dataframe(df_tfidf.round(3), use_container_width=True)
+    best_idx = similarities.argmax()
 
-        # similitud
+    best_doc = documents[best_idx]
 
-        question_vec = vectorizer.transform([question])
+    best_score = similarities[best_idx]
 
-        similarities = cosine_similarity(question_vec, X).flatten()
+    st.markdown("### 🎯 Respuesta")
 
-        best_idx = similarities.argmax()
+    st.markdown(f"**Tu pregunta:** {question}")
 
-        best_doc = documents[best_idx]
-
-        best_score = similarities[best_idx]
-
-        st.markdown("### 🎯 Respuesta")
-
-        st.markdown(f"**Tu pregunta:** {question}")
-
-        if best_score > 0.01:
-
-            st.success(f"**Respuesta:** {best_doc}")
-            st.info(f"📈 Similitud: {best_score:.3f}")
-
-        else:
-
-            st.warning(f"**Respuesta (baja confianza):** {best_doc}")
-            st.info(f"📉 Similitud: {best_score:.3f}")
+    st.success(best_doc)
+    st.info(f"Similitud: {best_score:.3f}")
